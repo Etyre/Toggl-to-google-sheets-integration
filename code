@@ -1,0 +1,78 @@
+function loadThingsFromToggl() {
+  
+  //
+  var maxLoc = "maxvalue"
+  var sheetNumber = 4
+  // this is the number of the sheet you'll be importing to. Change it to whatever you actually want it to be.    
+  // remeber 0 indexing
+ 
+  //TOGGLE IMPORT
+  
+  var accountIds = {};
+  accountIds.headers = {"Authorization": "Basic " + Utilities.base64Encode(" ")};
+  //you'll need to put in your own API token, which you can find at the bottom of your profile settings page.
+  
+  var response = UrlFetchApp.fetch("https://www.toggl.com/api/v8/time_entries?", accountIds);
+  var json = response.getContentText()
+  var obj = eval(json)
+  //Logger.log(response.getContentText());
+  
+  //SPREADSHEET SETUP
+  //SpreadsheetApp.getUi()
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  //Logger.log(ss);
+  var sheet = ss.getSheets()[sheetNumber];
+  //Logger.log(sheet);
+  
+  // this pulls the highest id number already on the sheet from the cell k:1
+  var range = ss.getRangeByName(maxLoc);
+  
+  // The row and column here are relative to the range
+  // getCell(1,1) in this code returns the cell at k1
+  var maxID = range.getCell(1, 1);
+  // Logger.log(maxID.getValue());
+  
+  //DATA ENTRY
+  
+  for (i=0; i < obj.length; i++){
+    
+    //checks if the entry is already on the sheet by comparing its id to the maxID
+    if (obj[i].id > maxID.getValue()) {
+    
+      //checks if the entry has at least one tag
+      if ("tags" in obj[i]) {
+        
+        //checks if the entry is currently running (and so doesn't have an endtime yet)
+        if (obj[i].stop != undefined) {
+          
+          // takes the object that has the tags and makes it into a string
+          var tagsString = ""
+          for (x=0; x < obj[i].tags.length; x++) {
+            tagsString = tagsString.concat(obj[i].tags[x]).concat(",")
+          }
+          
+          // takes the date from the starttime and subtracts 5 hours (because Toggl uses a realy werid tiemzone for it's internal data
+          var date = obj[i].start.split("T")[0]
+          var timeInAtlanticTZ = (obj[i].start.split("T")[1]).split("+")[0]
+          Logger.log(timeInAtlanticTZ);
+          Logger.log(date);
+          
+      
+          var dateTimeInATZ = new Date(Date(timeInAtlanticTZ));
+          Logger.log(dateTimeInATZ);
+          var betterDateTime = new Date(dateTimeInATZ.getTime() - 5*(3600*1000));
+          Logger.log(betterDateTime);
+          
+            
+          var input = ["",betterDateTime, obj[i].start, obj[i].stop, (obj[i].duration/3600), obj[i].description, tagsString, obj[i].project, obj[i].client, obj[i].id, obj[i].uid]; 
+                
+          // Appends a new row with 10 columns to the bottom of the
+          // spreadsheet containing the values in the array
+          sheet.appendRow(input);
+          
+          
+        }
+      }
+    } 
+  }
+}
